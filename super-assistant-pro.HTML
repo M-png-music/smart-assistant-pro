@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Smart Assistant Pro</title>
+  <style id="themeStyle">
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background-color: #f0f8ff;
+      color: #000;
+      text-align: center;
+      padding: 40px;
+    }
+    h1 {
+      color: #1565c0;
+    }
+    .dark {
+      background-color: #212121;
+      color: #fff;
+    }
+    button {
+      font-size: 16px;
+      padding: 8px 16px;
+      margin: 6px;
+      border-radius: 8px;
+      cursor: pointer;
+      background-color: #2196f3;
+      color: white;
+      border: none;
+    }
+    .device {
+      margin: 20px auto;
+      padding: 15px;
+      width: 300px;
+      border-radius: 10px;
+      background-color: #fff;
+      box-shadow: 2px 2px 10px rgba(0,0,0,0.1);
+    }
+    .dark .device {
+      background-color: #424242;
+    }
+    .on {
+      background-color: #e1f5fe;
+      font-weight: bold;
+    }
+    .glow {
+      color: gold;
+      text-shadow: 0 0 8px yellow;
+    }
+    .spin {
+      animation: spin 2s linear infinite;
+      display: inline-block;
+    }
+    @keyframes spin {
+      100% { transform: rotate(360deg); }
+    }
+    #response {
+      font-size: 18px;
+      margin-top: 15px;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>🏡 Smart Assistant Pro</h1>
+  <button onclick="startListening()">🎤 Voice Command</button>
+  <button onclick="toggleTheme()">🌗 Toggle Theme</button>
+  <div id="response">Say "Turn on the fan" or "What time is it?"</div>
+
+  <div class="device" id="lightBox">
+    💡 Light: <span id="lightStatus">OFF</span>
+    <br><button onclick="toggleDevice('light')">Toggle Light</button>
+  </div>
+
+  <div class="device" id="fanBox">
+    🌀 Fan: <span id="fanStatus">OFF</span>
+    <br><button onclick="toggleDevice('fan')">Toggle Fan</button>
+  </div>
+
+  <div class="device" id="tvBox">
+    📺 TV: <span id="tvStatus">OFF</span>
+    <br><button onclick="toggleDevice('tv')">Toggle TV</button>
+  </div>
+
+  <div class="device" id="acBox">
+    ❄️ AC: <span id="acStatus">OFF</span>
+    <br><button onclick="toggleDevice('ac')">Toggle AC</button>
+  </div>
+
+  <div class="device" id="doorBox">
+    🚪 Door: <span id="doorStatus">LOCKED</span>
+    <br><button onclick="toggleDevice('door')">Toggle Door</button>
+  </div>
+
+  <audio id="clickSound" src="https://www.soundjay.com/buttons/sounds/button-09.mp3"></audio>
+
+  <script>
+    const synth = window.speechSynthesis;
+    const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+    recognition.lang = 'en-US';
+
+    const response = document.getElementById("response");
+    const clickSound = document.getElementById("clickSound");
+
+    const devices = {
+      light: { status: "OFF", element: "lightStatus", box: "lightBox" },
+      fan: { status: "OFF", element: "fanStatus", box: "fanBox" },
+      ac: { status: "OFF", element: "acStatus", box: "acBox" },
+      tv: { status: "OFF", element: "tvStatus", box: "tvBox" },
+      door: { status: "LOCKED", element: "doorStatus", box: "doorBox" }
+    };
+
+    // Load saved states on startup
+    window.onload = () => {
+      Object.keys(devices).forEach(device => {
+        const saved = localStorage.getItem(device);
+        if (saved) {
+          devices[device].status = saved;
+          updateUI(device, saved);
+        }
+      });
+
+      const savedTheme = localStorage.getItem("theme");
+      if (savedTheme === "dark") document.body.classList.add("dark");
+    };
+
+    function speak(text) {
+      const utter = new SpeechSynthesisUtterance(text);
+      synth.speak(utter);
+    }
+
+    function playClick() {
+      clickSound.play();
+    }
+
+    function updateUI(device, newState) {
+      const el = document.getElementById(devices[device].element);
+      const box = document.getElementById(devices[device].box);
+
+      el.textContent = newState;
+      box.classList.toggle("on", newState === "ON" || newState === "UNLOCKED");
+
+      if (device === "light") {
+        el.className = newState === "ON" ? "glow" : "";
+      }
+      if (device === "fan") {
+        el.className = newState === "ON" ? "spin" : "";
+      }
+
+      playClick();
+      localStorage.setItem(device, newState);
+    }
+
+    function toggleDevice(device) {
+      let newState = "OFF";
+      if (device === "door") {
+        newState = devices[device].status === "LOCKED" ? "UNLOCKED" : "LOCKED";
+      } else {
+        newState = devices[device].status === "OFF" ? "ON" : "OFF";
+      }
+
+      devices[device].status = newState;
+      updateUI(device, newState);
+      speak(`${device} is now ${newState}`);
+    }
+
+    function toggleTheme() {
+      document.body.classList.toggle("dark");
+      const theme = document.body.classList.contains("dark") ? "dark" : "light";
+      localStorage.setItem("theme", theme);
+    }
+
+    function handleCommand(command) {
+      command = command.toLowerCase();
+      let matched = false;
+
+      Object.keys(devices).forEach(device => {
+        if (command.includes(`turn on the ${device}`)) {
+          devices[device].status = device === "door" ? "UNLOCKED" : "ON";
+          updateUI(device, devices[device].status);
+          speak(`${device} turned on`);
+          matched = true;
+        } else if (command.includes(`turn off the ${device}`)) {
+          devices[device].status = device === "door" ? "LOCKED" : "OFF";
+          updateUI(device, devices[device].status);
+          speak(`${device} turned off`);
+          matched = true;
+        }
+      });
+
+      // Smart Q&A
+      if (!matched) {
+        if (command.includes("what time")) {
+          const time = new Date().toLocaleTimeString();
+          speak(`The time is ${time}`);
+          response.textContent = `The time is ${time}`;
+        } else if (command.includes("your name")) {
+          speak("I am your Smart Assistant Pro.");
+          response.textContent = "I'm Smart Assistant Pro!";
+        } else if (command.includes("what can you do")) {
+          speak("I can control your smart devices, tell you the time, change themes, and more!");
+          response.textContent = "Try saying: Turn on the fan, or Toggle theme.";
+        } else if (command.includes("hello") || command.includes("hi")) {
+          speak("Hello Manvik! How can I help you?");
+          response.textContent = "Hello Manvik!";
+        } else {
+          speak("Sorry, I didn't understand that.");
+          response.textContent = "Command not recognized.";
+        }
+      }
+    }
+
+    function startListening() {
+      response.textContent = "🎧 Listening...";
+      recognition.start();
+    }
+
+    recognition.onresult = function(event) {
+      const command = event.results[0][0].transcript;
+      response.textContent = `You said: "${command}"`;
+      handleCommand(command);
+    };
+
+    recognition.onerror = function() {
+      response.textContent = "Try again.";
+      speak("Something went wrong.");
+    };
+  </script>
+</body>
+</html>
